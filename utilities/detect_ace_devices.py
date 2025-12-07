@@ -103,9 +103,12 @@ def generate_config():
         print(f"# auto_detect: true")
         print(f"# device_index: {i}")
         print()
-        print(f"# Hub and extruder (configure as needed)")
+        print(f"# Extruder configuration (REQUIRED)")
+        print(f"extruder: extruder")
+        print()
+        print(f"# Hub configuration (OPTIONAL - only uncomment if you have an AFC hub)")
+        print(f"# ACE Pro manages filament internally, so hub is usually not needed")
         print(f"# hub: hub")
-        print(f"# extruder: extruder")
         print()
 
         # Generate 4 lanes per ACE device
