@@ -83,11 +83,10 @@ cd AFC-ACE-Integration
 ./install-afc-ace.sh
 
 # 3. Generate config
-python3 utilities/detect_ace_devices.py --generate-config > ~/printer_data/config/AFC/ACE_units.cfg
+python3 utilities/detect_ace_devices.py --generate-config > ~/printer_data/config/AFC/AFC_ACE_Pro.cfg
 
-# 4. Add to printer.cfg
+# 4. Add to printer.cfg (AFC_ACE_Pro.cfg is auto-loaded)
 echo "[include AFC/*.cfg]" >> ~/printer_data/config/printer.cfg
-echo "[include AFC/ACE_units.cfg]" >> ~/printer_data/config/printer.cfg
 
 # 5. Restart Klipper
 sudo systemctl restart klipper

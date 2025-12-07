@@ -61,12 +61,12 @@ Device 0:
 
 ```bash
 # Generate config
-python3 utilities/detect_ace_devices.py --generate-config > ~/printer_data/config/AFC/ACE_units.cfg
+python3 utilities/detect_ace_devices.py --generate-config > ~/printer_data/config/AFC/AFC_ACE_Pro.cfg
 ```
 
 **Verify generated file:**
 ```bash
-cat ~/printer_data/config/AFC/ACE_units.cfg
+cat ~/printer_data/config/AFC/AFC_ACE_Pro.cfg
 ```
 
 **Should contain:**
@@ -81,11 +81,12 @@ cat ~/printer_data/config/AFC/ACE_units.cfg
 nano ~/printer_data/config/printer.cfg
 ```
 
-**Add these lines:**
+**Add this line:**
 ```ini
 [include AFC/*.cfg]
-[include AFC/ACE_units.cfg]
 ```
+
+**Note:** AFC_ACE_Pro.cfg is automatically included via the wildcard.
 
 **Restart Klipper:**
 ```bash
@@ -233,7 +234,7 @@ python3 utilities/detect_ace_devices.py
 
 **Generate config with all devices:**
 ```bash
-python3 utilities/detect_ace_devices.py --generate-config > ~/printer_data/config/AFC/ACE_units.cfg
+python3 utilities/detect_ace_devices.py --generate-config > ~/printer_data/config/AFC/AFC_ACE_Pro.cfg
 ```
 
 **Verify config has:**
@@ -358,7 +359,7 @@ When reporting issues, include:
 
 4. **Config:**
    ```bash
-   cat ~/printer_data/config/AFC/ACE_units.cfg
+   cat ~/printer_data/config/AFC/AFC_ACE_Pro.cfg
    ```
 
 5. **Steps to reproduce**

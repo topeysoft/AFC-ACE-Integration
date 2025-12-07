@@ -53,7 +53,7 @@ Auto-detect your ACE devices and generate configuration:
 
 ```bash
 cd ~/AFC-ACE-Integration
-python3 utilities/detect_ace_devices.py --generate-config > ~/printer_data/config/AFC/ACE_units.cfg
+python3 utilities/detect_ace_devices.py --generate-config > ~/printer_data/config/AFC/AFC_ACE_Pro.cfg
 ```
 
 This will create a configuration file with all detected ACE devices and their lanes.
@@ -63,7 +63,7 @@ This will create a configuration file with all detected ACE devices and their la
 Edit the generated configuration to match your setup:
 
 ```bash
-nano ~/printer_data/config/AFC/ACE_units.cfg
+nano ~/printer_data/config/AFC/AFC_ACE_Pro.cfg
 ```
 
 Key things to configure:
@@ -77,12 +77,11 @@ Key things to configure:
 Add these lines to your `printer.cfg`:
 
 ```ini
-# AFC base system (if not already included)
+# AFC system (includes all AFC_*.cfg files automatically)
 [include AFC/*.cfg]
-
-# AFC-ACE units
-[include AFC/ACE_units.cfg]
 ```
+
+**Note:** The `AFC_ACE_Pro.cfg` file will be automatically included since it matches the `AFC/*.cfg` wildcard pattern. No need for a separate include statement!
 
 ### Step 6: Restart Klipper
 
@@ -227,13 +226,13 @@ This displays:
 
 2. Common errors:
    - **Import error**: Check symlinks in `~/klipper/klippy/extras/`
-   - **Config error**: Validate `ACE_units.cfg` syntax
+   - **Config error**: Validate `AFC_ACE_Pro.cfg` syntax
    - **Serial error**: Verify ACE is connected and accessible
 
 3. Temporarily disable AFC-ACE to isolate issue:
    ```ini
    # Comment out in printer.cfg:
-   # [include AFC/ACE_units.cfg]
+   # [include AFC/AFC_ACE_Pro.cfg]
    ```
 
 ## Next Steps

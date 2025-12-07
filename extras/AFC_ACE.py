@@ -399,3 +399,6 @@ class afcACE(afcUnit):
 def load_config_prefix(config):
     """Klipper load function for [AFC_ACE name] sections"""
     return afcACE(config)
+
+# Also support direct loading for backwards compatibility
+load_config = load_config_prefix
