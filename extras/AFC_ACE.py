@@ -48,6 +48,10 @@ class afcACE(afcUnit):
         super().__init__(config)
         self.type = config.get('type', 'ACE_Pro')
 
+        # ACE does NOT use a hub - it manages filament internally
+        # Override the hub parameter from base class to prevent hub lookup errors
+        self.hub = None
+
         # ACE-specific configuration
         self.serial = config.get('serial', None)
         self.auto_detect = config.getboolean('auto_detect', False)
