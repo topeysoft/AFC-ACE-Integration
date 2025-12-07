@@ -194,9 +194,21 @@ class AceProtocol:
                 port=self.port,
                 baudrate=self.baud,
                 timeout=self.timeout,
-                write_timeout=self.timeout
+                write_timeout=self.timeout,
+                exclusive=True  # Prevent other processes from opening the port
             )
+
+            # Clear any stale data in buffers
+            self.serial.reset_input_buffer()
+            self.serial.reset_output_buffer()
+            self.read_buffer = bytearray()
+
             logging.info(f"AFC_ACE: Connected to {self.port} at {self.baud} baud")
+
+            # Give device time to stabilize after connection
+            import time
+            time.sleep(0.1)
+
             return True
         except serial.SerialException as e:
             logging.error(f"AFC_ACE: Failed to connect to {self.port}: {e}")
@@ -275,6 +287,39 @@ class AceProtocol:
 
         except serial.SerialException as e:
             logging.error(f"AFC_ACE: Serial error during command '{method}': {e}")
+
+            # Try to recover from I/O errors by reconnecting
+            if "Input/output error" in str(e) or "[Errno 5]" in str(e):
+                logging.warning(f"AFC_ACE: Attempting to reconnect to {self.port}...")
+                self.disconnect()
+                if self.connect():
+                    logging.info(f"AFC_ACE: Reconnected successfully, retrying command")
+                    # Retry command once after reconnection
+                    try:
+                        packet = AcePacket.encode(request)
+                        self.serial.write(packet)
+                        self.serial.flush()
+
+                        import time
+                        start_time = time.time()
+                        while (time.time() - start_time) < timeout:
+                            if self.serial.in_waiting > 0:
+                                self.read_buffer += self.serial.read(self.serial.in_waiting)
+                                packet_bytes, self.read_buffer = AcePacket.find_packet_in_buffer(self.read_buffer)
+                                if packet_bytes:
+                                    response, error = AcePacket.decode(packet_bytes)
+                                    if error:
+                                        continue
+                                    if response and 'result' in response:
+                                        return response['result']
+                                    elif response and 'error' in response:
+                                        return None
+                            time.sleep(0.05)
+                    except Exception as retry_error:
+                        logging.error(f"AFC_ACE: Retry after reconnect failed: {retry_error}")
+                else:
+                    logging.error(f"AFC_ACE: Reconnection failed")
+
             return None
 
     # ============================================================

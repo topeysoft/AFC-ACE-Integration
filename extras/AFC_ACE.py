@@ -155,8 +155,13 @@ class afcACE(afcUnit):
 
             logging.info(f"AFC_ACE: ✓ Connected to {model} (FW: {firmware}) at {self.serial}")
 
-            # Get initial status
+            # Get initial status (with delay to allow device to be ready)
+            import time
+            time.sleep(0.2)
             self.last_status = self.protocol.get_status()
+
+            if not self.last_status:
+                logging.warning(f"AFC_ACE: Could not get initial status from {self.serial}, will retry later")
 
         except Exception as e:
             logging.error(f"AFC_ACE: Connection error: {e}")
