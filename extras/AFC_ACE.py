@@ -399,6 +399,66 @@ class afcACE(afcUnit):
 
         logging.info(f"AFC_ACE: Lane '{cur_lane.name}' loaded into toolhead")
 
+    def calibrate_lane(self, cur_lane, tol):
+        """
+        Calibrate a lane.
+
+        For ACE Pro, calibration is not needed since the device manages
+        filament positioning internally via its protocol.
+
+        Args:
+            cur_lane: Lane to calibrate
+            tol: Tolerance (unused for ACE)
+
+        Returns:
+            Tuple of (checked, msg, pos)
+        """
+        slot = self.get_slot_for_lane(cur_lane)
+
+        # ACE handles filament positioning internally, no calibration needed
+        msg = f"ACE Pro slot {slot} does not require calibration - device manages filament internally"
+
+        self.afc.gcode.respond_info(msg)
+        logging.info(f"AFC_ACE: {msg}")
+
+        # Return success with current position (ACE manages this internally)
+        return True, msg, 0.0
+
+    def calibrate_bowden(self, cur_lane, dis, tol):
+        """
+        Calibrate bowden tube length.
+
+        ACE Pro manages filament path internally, no bowden calibration needed.
+
+        Args:
+            cur_lane: Lane to calibrate
+            dis: Distance (unused)
+            tol: Tolerance (unused)
+
+        Returns:
+            Tuple of (checked, msg, pos)
+        """
+        msg = "ACE Pro does not require bowden calibration - device manages filament path"
+        self.afc.gcode.respond_info(msg)
+        return True, msg, 0.0
+
+    def calibrate_hub(self, cur_lane, tol):
+        """
+        Calibrate hub distance.
+
+        ACE Pro does not use a hub - it manages filament internally.
+
+        Args:
+            cur_lane: Lane to calibrate
+            tol: Tolerance (unused)
+
+        Returns:
+            Tuple of (checked, msg, pos)
+        """
+        msg = "ACE Pro does not use a hub - no hub calibration needed"
+        self.afc.gcode.respond_info(msg)
+        return True, msg, 0.0
+
 
 def load_config_prefix(config):
     """Klipper load function for [AFC_ACE name] sections"""
