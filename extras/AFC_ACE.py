@@ -108,8 +108,8 @@ class afcACE(afcUnit):
         # Connect to ACE device
         self._connect_ace()
 
-        # Build lane to slot mapping
-        self._build_lane_mapping()
+        # Note: Lane mapping is built lazily in get_slot_for_lane()
+        # because lanes aren't registered to the unit until after handle_connect()
 
     def _connect_ace(self):
         """Connect to ACE Pro device via USB"""
@@ -167,6 +167,10 @@ class afcACE(afcUnit):
         # Each lane in this unit corresponds to an ACE slot (0-3)
         # Lanes are registered with unit like "unit_name:slot_index"
 
+        if not self.lanes:
+            logging.debug(f"AFC_ACE: No lanes registered yet for unit '{self.name}', skipping mapping")
+            return
+
         for lane in self.lanes.values():
             # Extract slot index from lane's unit specification
             # Lane config: unit: ace1:0  means slot 0 of unit ace1
@@ -186,6 +190,10 @@ class afcACE(afcUnit):
         Returns:
             ACE slot index (0-3)
         """
+        # Build mapping lazily if not done yet
+        if not self.lane_to_slot and self.lanes:
+            self._build_lane_mapping()
+
         lane_name = lane if isinstance(lane, str) else lane.name
 
         if lane_name not in self.lane_to_slot:
@@ -332,6 +340,10 @@ class afcACE(afcUnit):
             assignTcmd: Whether to assign T command
             enable_movement: Whether to enable movement (for ACE, we just query status)
         """
+        # Ensure lane mapping is built (lazy initialization)
+        if not self.lane_to_slot and self.lanes:
+            self._build_lane_mapping()
+
         msg = ''
         succeeded = True
 
