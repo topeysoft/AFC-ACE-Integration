@@ -372,11 +372,14 @@ class afcACE(afcUnit):
                 self.afc.function.afc_led(cur_lane.led_not_ready, cur_lane.led_index)
                 msg = 'EMPTY READY FOR SPOOL'
                 cur_lane.status = AFCLaneState.NONE
+                cur_lane.prep = True  # Lane is prepped (empty, ready for spool)
+                succeeded = True
 
             elif slot_status == 'ready':
                 self.afc.function.afc_led(cur_lane.led_ready, cur_lane.led_index)
                 msg = "<span class=success--text>LOCKED AND LOADED</span>"
                 cur_lane.status = AFCLaneState.LOADED
+                cur_lane.prep = True  # Lane is prepped (filament loaded and ready)
                 succeeded = True
 
                 # Illuminate spool LED
