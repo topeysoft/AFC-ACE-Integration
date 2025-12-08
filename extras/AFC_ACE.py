@@ -46,7 +46,7 @@ class afcACE(afcUnit):
             config: Klipper configuration object
         """
         super().__init__(config)
-        self.type = config.get('type', 'ACE_Pro')
+        self.type = config.get('type', 'ACE')  # Changed from ACE_Pro to ACE to match class name AFC_ACE
 
         # ACE does NOT use a hub - it manages filament internally
         # Override the hub parameter from base class to prevent hub lookup errors
