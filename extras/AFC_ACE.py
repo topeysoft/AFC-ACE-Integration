@@ -364,9 +364,9 @@ class afcACE(afcUnit):
                 self.afc.function.afc_led(cur_lane.led_not_ready, cur_lane.led_index)
                 msg = "<span class=warning--text>UNKNOWN (Communication Error)</span>"
                 cur_lane.status = AFCLaneState.NONE
-                cur_lane.prep = True  # Still mark as prepped so lane shows in UI
-                cur_lane.load = True  # Ensure load is also set
-                logging.info(f"AFC_ACE: Set lane '{cur_lane.name}' prep={cur_lane.prep} load={cur_lane.load}")
+                cur_lane.prep_state = True  # Set prep_state (exposed as 'prep' in API)
+                cur_lane.load_state = True  # Set load_state (exposed as 'load' in API)
+                logging.info(f"AFC_ACE: Set lane '{cur_lane.name}' prep_state={cur_lane.prep_state} load_state={cur_lane.load_state}")
                 succeeded = True  # Don't fail prep for communication errors
                 return msg, succeeded
 
@@ -378,14 +378,16 @@ class afcACE(afcUnit):
                 self.afc.function.afc_led(cur_lane.led_not_ready, cur_lane.led_index)
                 msg = 'EMPTY READY FOR SPOOL'
                 cur_lane.status = AFCLaneState.NONE
-                cur_lane.prep = True  # Lane is prepped (empty, ready for spool)
+                cur_lane.prep_state = True  # Lane is prepped (empty, ready for spool)
+                cur_lane.load_state = True
                 succeeded = True
 
             elif slot_status == 'ready':
                 self.afc.function.afc_led(cur_lane.led_ready, cur_lane.led_index)
                 msg = "<span class=success--text>LOCKED AND LOADED</span>"
                 cur_lane.status = AFCLaneState.LOADED
-                cur_lane.prep = True  # Lane is prepped (filament loaded and ready)
+                cur_lane.prep_state = True  # Lane is prepped (filament loaded and ready)
+                cur_lane.load_state = True
                 succeeded = True
 
                 # Illuminate spool LED
