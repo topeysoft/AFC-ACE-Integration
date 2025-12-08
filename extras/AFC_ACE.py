@@ -365,6 +365,8 @@ class afcACE(afcUnit):
                 msg = "<span class=warning--text>UNKNOWN (Communication Error)</span>"
                 cur_lane.status = AFCLaneState.NONE
                 cur_lane.prep = True  # Still mark as prepped so lane shows in UI
+                cur_lane.load = True  # Ensure load is also set
+                logging.info(f"AFC_ACE: Set lane '{cur_lane.name}' prep={cur_lane.prep} load={cur_lane.load}")
                 succeeded = True  # Don't fail prep for communication errors
                 return msg, succeeded
 
