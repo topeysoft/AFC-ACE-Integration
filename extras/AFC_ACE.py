@@ -54,11 +54,14 @@ class afcACE(afcUnit):
 
         # Create mock hub object to prevent lanes from auto-assigning to other hubs
         # AFC lanes check unit.hub_obj and auto-assign to first available hub if None
+        # ACE manages filament internally, so hub operations are not needed
         class MockHub:
             def __init__(self):
-                self.state = True  # Always "triggered" - ACE manages filament internally
-                self.name = None   # No actual hub name
-                self.lanes = {}    # Lanes will register here instead of real hub
+                self.state = True     # Always "triggered" - ACE manages filament internally
+                self.name = None      # No actual hub name
+                self.lanes = {}       # Lanes will register here instead of real hub
+                self.move_dis = 0     # Hub move distance (not used for ACE)
+                self.load_length = 0  # Hub load length (not used for ACE)
 
         self.hub_obj = MockHub()
 
