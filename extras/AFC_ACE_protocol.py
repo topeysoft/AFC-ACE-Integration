@@ -14,6 +14,7 @@ import struct
 import json
 import serial
 import logging
+import threading
 from typing import Dict, Any, Optional, Tuple
 
 # Protocol Constants
@@ -181,6 +182,7 @@ class AceProtocol:
         self.serial = None
         self._request_id = 0
         self.read_buffer = bytearray()
+        self._lock = threading.Lock()  # Thread-safe access to serial port
 
     def connect(self) -> bool:
         """
@@ -244,94 +246,95 @@ class AceProtocol:
         Returns:
             Response dictionary or None on error
         """
-        if not self.serial or not self.serial.is_open:
-            logging.error("AFC_ACE: Serial port not open")
-            return None
+        with self._lock:  # Ensure thread-safe serial access
+            if not self.serial or not self.serial.is_open:
+                logging.error("AFC_ACE: Serial port not open")
+                return None
 
-        # Build request
-        request = {
-            "id": self._get_next_request_id(),
-            "method": method
-        }
-        if params:
-            request["params"] = params
+            # Build request
+            request = {
+                "id": self._get_next_request_id(),
+                "method": method
+            }
+            if params:
+                request["params"] = params
 
-        # Encode and send
-        packet = AcePacket.encode(request)
+            # Encode and send
+            packet = AcePacket.encode(request)
 
-        try:
-            # Small delay before sending to prevent overwhelming device
-            import time
-            time.sleep(0.05)
-
-            self.serial.write(packet)
-            self.serial.flush()
-
-            # Wait for response
-            import time
-            start_time = time.time()
-
-            while (time.time() - start_time) < timeout:
-                if self.serial.in_waiting > 0:
-                    self.read_buffer += self.serial.read(self.serial.in_waiting)
-
-                    # Try to extract packet
-                    packet_bytes, self.read_buffer = AcePacket.find_packet_in_buffer(self.read_buffer)
-
-                    if packet_bytes:
-                        response, error = AcePacket.decode(packet_bytes)
-
-                        if error:
-                            logging.warning(f"AFC_ACE: Packet decode error: {error}")
-                            continue
-
-                        if response and 'result' in response:
-                            return response['result']
-                        elif response and 'error' in response:
-                            logging.error(f"AFC_ACE: Command error: {response['error']}")
-                            return None
-
+            try:
+                # Small delay before sending to prevent overwhelming device
+                import time
                 time.sleep(0.05)
 
-            logging.warning(f"AFC_ACE: Command '{method}' timed out after {timeout}s")
-            return None
+                self.serial.write(packet)
+                self.serial.flush()
 
-        except serial.SerialException as e:
-            logging.error(f"AFC_ACE: Serial error during command '{method}': {e}")
+                # Wait for response
+                import time
+                start_time = time.time()
 
-            # Try to recover from I/O errors by reconnecting
-            if "Input/output error" in str(e) or "[Errno 5]" in str(e):
-                logging.warning(f"AFC_ACE: Attempting to reconnect to {self.port}...")
-                self.disconnect()
-                if self.connect():
-                    logging.info(f"AFC_ACE: Reconnected successfully, retrying command")
-                    # Retry command once after reconnection
-                    try:
-                        packet = AcePacket.encode(request)
-                        self.serial.write(packet)
-                        self.serial.flush()
+                while (time.time() - start_time) < timeout:
+                    if self.serial.in_waiting > 0:
+                        self.read_buffer += self.serial.read(self.serial.in_waiting)
 
-                        import time
-                        start_time = time.time()
-                        while (time.time() - start_time) < timeout:
-                            if self.serial.in_waiting > 0:
-                                self.read_buffer += self.serial.read(self.serial.in_waiting)
-                                packet_bytes, self.read_buffer = AcePacket.find_packet_in_buffer(self.read_buffer)
-                                if packet_bytes:
-                                    response, error = AcePacket.decode(packet_bytes)
-                                    if error:
-                                        continue
-                                    if response and 'result' in response:
-                                        return response['result']
-                                    elif response and 'error' in response:
-                                        return None
-                            time.sleep(0.05)
-                    except Exception as retry_error:
-                        logging.error(f"AFC_ACE: Retry after reconnect failed: {retry_error}")
-                else:
-                    logging.error(f"AFC_ACE: Reconnection failed")
+                        # Try to extract packet
+                        packet_bytes, self.read_buffer = AcePacket.find_packet_in_buffer(self.read_buffer)
 
-            return None
+                        if packet_bytes:
+                            response, error = AcePacket.decode(packet_bytes)
+
+                            if error:
+                                logging.warning(f"AFC_ACE: Packet decode error: {error}")
+                                continue
+
+                            if response and 'result' in response:
+                                return response['result']
+                            elif response and 'error' in response:
+                                logging.error(f"AFC_ACE: Command error: {response['error']}")
+                                return None
+
+                    time.sleep(0.05)
+
+                logging.warning(f"AFC_ACE: Command '{method}' timed out after {timeout}s")
+                return None
+
+            except serial.SerialException as e:
+                logging.error(f"AFC_ACE: Serial error during command '{method}': {e}")
+
+                # Try to recover from I/O errors by reconnecting
+                if "Input/output error" in str(e) or "[Errno 5]" in str(e):
+                    logging.warning(f"AFC_ACE: Attempting to reconnect to {self.port}...")
+                    self.disconnect()
+                    if self.connect():
+                        logging.info(f"AFC_ACE: Reconnected successfully, retrying command")
+                        # Retry command once after reconnection
+                        try:
+                            packet = AcePacket.encode(request)
+                            self.serial.write(packet)
+                            self.serial.flush()
+
+                            import time
+                            start_time = time.time()
+                            while (time.time() - start_time) < timeout:
+                                if self.serial.in_waiting > 0:
+                                    self.read_buffer += self.serial.read(self.serial.in_waiting)
+                                    packet_bytes, self.read_buffer = AcePacket.find_packet_in_buffer(self.read_buffer)
+                                    if packet_bytes:
+                                        response, error = AcePacket.decode(packet_bytes)
+                                        if error:
+                                            continue
+                                        if response and 'result' in response:
+                                            return response['result']
+                                        elif response and 'error' in response:
+                                            return None
+                                time.sleep(0.05)
+                        except Exception as retry_error:
+                            logging.error(f"AFC_ACE: Retry after reconnect failed: {retry_error}")
+                    else:
+                        logging.error(f"AFC_ACE: Reconnection failed")
+
+                return None
 
     # ============================================================
     # ACE Commands

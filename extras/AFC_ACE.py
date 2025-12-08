@@ -359,9 +359,13 @@ class afcACE(afcUnit):
             status = self.protocol.get_status()
 
             if not status or 'slots' not in status:
-                self.afc.function.afc_led(cur_lane.led_fault, cur_lane.led_index)
-                msg = "<span class=error--text>ACE COMMUNICATION ERROR</span>"
-                succeeded = False
+                # Communication error - but don't fail entirely, mark lane as unknown
+                logging.warning(f"AFC_ACE: Could not get status for lane '{cur_lane.name}' (slot {slot})")
+                self.afc.function.afc_led(cur_lane.led_not_ready, cur_lane.led_index)
+                msg = "<span class=warning--text>UNKNOWN (Communication Error)</span>"
+                cur_lane.status = AFCLaneState.NONE
+                cur_lane.prep = True  # Still mark as prepped so lane shows in UI
+                succeeded = True  # Don't fail prep for communication errors
                 return msg, succeeded
 
             slot_info = status['slots'][slot]
