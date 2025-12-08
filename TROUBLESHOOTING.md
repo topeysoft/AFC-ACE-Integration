@@ -433,6 +433,57 @@ tail -100 ~/printer_data/logs/klippy.log
 
 ---
 
+## Lanes Not Visible in UI
+
+### Symptoms
+- ACE units show up in Mainsail/Fluidd UI
+- No lanes appear under the units
+- Console shows "Prepping lanes" but lanes stay hidden
+
+### Cause
+Lanes need both `load: true` and `prep: true` to be visible in the UI. The `prep` flag is set when `system_Test()` successfully queries the ACE device status.
+
+### Debug Steps
+
+**1. Check if lanes exist in Klipper state:**
+```bash
+curl -s "http://your-printer.local:7125/printer/objects/query?AFC_lane%20leg1" | python3 -m json.tool
+```
+
+Look for `"prep": true` and `"load": true` - both must be true for lanes to show.
+
+**2. Check for serial errors:**
+```bash
+tail -100 ~/printer_data/logs/klippy.log | grep "AFC_ACE.*Error"
+```
+
+If you see `Input/output error` or `write failed`, the ACE devices are not responding.
+
+### Solution
+
+**If serial errors are present:**
+
+1. **Power cycle the ACE devices** - Turn them off and back on
+2. **Restart Klipper** - `sudo systemctl restart klipper`
+3. **Run prep** - Type `prep` (lowercase) in console
+
+The serial communication with ACE devices can become unstable. If errors persist:
+
+- Check USB cable quality (use data cables, not charge-only)
+- Try a powered USB hub
+- Check for USB power issues: `dmesg | grep -i usb`
+- Reduce query frequency in code if needed
+
+**Quick Test:**
+```bash
+# Test ACE communication directly
+python3 ~/AFC-ACE-Integration/utilities/detect_ace_devices.py
+```
+
+If this shows devices but Klipper can't communicate, it's a serial port conflict or permission issue.
+
+---
+
 ## Prevention
 
 ### Best Practices

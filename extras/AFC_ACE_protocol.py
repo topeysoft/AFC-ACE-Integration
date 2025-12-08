@@ -190,12 +190,19 @@ class AceProtocol:
             True if successful, False otherwise
         """
         try:
+            # Close existing connection if any
+            if self.serial and self.serial.is_open:
+                try:
+                    self.serial.close()
+                except:
+                    pass
+
             self.serial = serial.Serial(
                 port=self.port,
                 baudrate=self.baud,
                 timeout=self.timeout,
-                write_timeout=self.timeout,
-                exclusive=True  # Prevent other processes from opening the port
+                write_timeout=self.timeout
+                # Note: exclusive=True removed - can cause issues on some systems
             )
 
             # Clear any stale data in buffers
@@ -207,7 +214,7 @@ class AceProtocol:
 
             # Give device time to stabilize after connection
             import time
-            time.sleep(0.1)
+            time.sleep(0.2)  # Increased from 0.1s to 0.2s
 
             return True
         except serial.SerialException as e:
@@ -253,6 +260,10 @@ class AceProtocol:
         packet = AcePacket.encode(request)
 
         try:
+            # Small delay before sending to prevent overwhelming device
+            import time
+            time.sleep(0.05)
+
             self.serial.write(packet)
             self.serial.flush()
 
