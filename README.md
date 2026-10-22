@@ -1,3 +1,33 @@
+> [!IMPORTANT]
+> **This project is archived.** It was a beta and stays one: it won't get new fixes or features.
+
+## If you want to stay on AFC
+
+[mon5termatt](https://github.com/mon5termatt) fixed the missing `ACE_*` commands and the dryer here
+(merged in #2), and has more fixes in
+[their fork](https://github.com/mon5termatt/AFC-ACE-Integration). Start there.
+
+## If you'd rather have screens than macros
+
+My ACE Pro work continues in **[Elyir Bench](https://github.com/elyir-labs/bench)**: a touchscreen and
+phone interface for Klipper printers, with ACE Pro support built in. Slots, spools, drying, feed assist
+and multi-color prints, all in plain screens. It drives the ACE with
+[its own free, open-source driver](https://github.com/elyir-labs/bench/blob/main/docs/filament-units.md)
+(AGPL-3.0-only) instead of AFC, so it's a different setup rather than an upgrade of this one.
+
+**[Try it in your browser](https://bench.elyir.com/try)**: the real screens with a pretend printer.
+No install.
+
+- ⭐ [Star Elyir Bench](https://github.com/elyir-labs/bench) to follow along.
+- **ACE Pro owners wanted as testers:** [bench.elyir.com/testers](https://bench.elyir.com/testers).
+
+Thank you for the stars and the fixes. Thanks also to the
+[Armored Turtle](https://github.com/ArmoredTurtle/AFC-Klipper-Add-On) team for AFC.
+
+---
+
+*The original documentation follows, unchanged.*
+
 # AFC-ACE Integration
 
 <div align="center">
