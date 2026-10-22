@@ -74,7 +74,7 @@ Example with 1 ACE Pro (4 lanes) + 1 BoxTurtle (4 lanes):
 auto_detect: true
 extruder: extruder
 
-[AFC_lane leg1]
+[AFC_lane lane1]
 unit: ace1:0
 map: T0
 extruder: extruder
@@ -86,7 +86,7 @@ extruder: extruder
 extruder: extruder
 hub: hub
 
-[AFC_lane leg5]
+[AFC_lane lane5]
 unit: turtle1:0
 map: T4
 extruder: extruder
@@ -290,12 +290,12 @@ Your config files are not overwritten during updates.
 # No extruder at unit level
 auto_detect: true
 
-[AFC_lane leg1]
+[AFC_lane lane1]
 unit: ace1:0
 map: T0
 extruder: extruder    # Left extruder
 
-[AFC_lane leg2]
+[AFC_lane lane2]
 unit: ace1:1
 map: T1
 extruder: extruder1   # Right extruder (IDEX)

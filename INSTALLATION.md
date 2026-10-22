@@ -99,8 +99,8 @@ Check Klipper console for successful initialization:
 
 ```
 AFC_ACE: Connected to ACE Pro (FW: v1.2.3) at /dev/serial/by-path/...
-AFC_ACE: Mapped lane 'leg1' → slot 0
-AFC_ACE: Mapped lane 'leg2' → slot 1
+AFC_ACE: Mapped lane 'lane1' → slot 0
+AFC_ACE: Mapped lane 'lane2' → slot 1
 ...
 ```
 

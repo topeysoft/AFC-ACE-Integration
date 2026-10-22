@@ -111,6 +111,9 @@ class afcACE(afcUnit):
         # Connect to ACE device
         self._connect_ace()
 
+        # Register ACE-specific G-code commands (ACE_GET_STATUS, ACE_FEED, etc.)
+        self._register_gcode_commands()
+
         # Note: Lane mapping is built lazily in get_slot_for_lane()
         # because lanes aren't registered to the unit until after handle_connect()
 
@@ -169,6 +172,274 @@ class afcACE(afcUnit):
         except Exception as e:
             logging.error(f"AFC_ACE: Connection error: {e}")
             raise error(f"AFC_ACE: Failed to connect to ACE device: {e}")
+
+    def _ensure_connected(self):
+        """
+        Ensure the unit has an open, working serial connection.
+
+        ACE devices may briefly disconnect/re-enumerate on USB (power saving,
+        hubs, flaky cables). If the underlying serial port disappears, attempt
+        to re-discover and reconnect when auto_detect is enabled.
+        """
+        try:
+            if not self.protocol or not self.connected:
+                self._connect_ace()
+                return
+            if not getattr(self.protocol, "serial", None) or not self.protocol.serial.is_open:
+                # Trigger a fresh connect path (including auto-detect)
+                self.connected = False
+                self._connect_ace()
+        except Exception as e:
+            # Leave a clean error for callers
+            raise error(f"AFC_ACE: Unable to (re)connect unit '{self.name}': {e}")
+
+    def _cmd_guard(self, label: str, fn):
+        """
+        Run a gcode handler safely.
+        If something goes wrong (USB disconnect, protocol error, bad params),
+        report it to the console instead of crashing Klipper.
+        """
+        try:
+            return fn()
+        except Exception as e:
+            logging.exception("AFC_ACE: %s failed for unit '%s'", label, self.name)
+            self.afc.gcode.respond_info(f"{label}: FAILED for unit '{self.name}': {e}")
+            return None
+
+    # ============================================================
+    # GCode commands
+    # ============================================================
+
+    def _register_gcode_commands(self):
+        # Per-unit mux commands (required for multi-ACE setups)
+        self.gcode.register_mux_command(
+            "ACE_GET_STATUS", "UNIT", self.name, self.cmd_ACE_GET_STATUS,
+            desc="Show ACE status for a specific unit (UNIT=<name>)"
+        )
+        self.gcode.register_mux_command(
+            "ACE_FEED", "UNIT", self.name, self.cmd_ACE_FEED,
+            desc="Feed filament from an ACE slot (UNIT=<name> INDEX=0-3 LENGTH=<mm> SPEED=10-80)"
+        )
+        self.gcode.register_mux_command(
+            "ACE_RETRACT", "UNIT", self.name, self.cmd_ACE_RETRACT,
+            desc="Retract filament back into an ACE slot (UNIT=<name> INDEX=0-3 LENGTH=<mm> SPEED=10-80)"
+        )
+        self.gcode.register_mux_command(
+            "ACE_START_DRYING", "UNIT", self.name, self.cmd_ACE_START_DRYING,
+            desc="Start ACE dryer (UNIT=<name> TEMP=<c> DURATION=<minutes>)"
+        )
+        self.gcode.register_mux_command(
+            "ACE_STOP_DRYING", "UNIT", self.name, self.cmd_ACE_STOP_DRYING,
+            desc="Stop ACE dryer (UNIT=<name>)"
+        )
+        self.gcode.register_mux_command(
+            "ACE_ENABLE_FEED_ASSIST", "UNIT", self.name, self.cmd_ACE_ENABLE_FEED_ASSIST,
+            desc="Enable ACE feed assist for a slot (UNIT=<name> LANE=0-3)"
+        )
+        self.gcode.register_mux_command(
+            "ACE_DISABLE_FEED_ASSIST", "UNIT", self.name, self.cmd_ACE_DISABLE_FEED_ASSIST,
+            desc="Disable ACE feed assist for a slot (UNIT=<name> LANE=0-3)"
+        )
+
+        self.gcode.register_mux_command(
+            "ACE_ENABLE_RFID", "UNIT", self.name, self.cmd_ACE_ENABLE_RFID,
+            desc="Enable ACE RFID reader (UNIT=<name>)"
+        )
+        self.gcode.register_mux_command(
+            "ACE_DISABLE_RFID", "UNIT", self.name, self.cmd_ACE_DISABLE_RFID,
+            desc="Disable ACE RFID reader (UNIT=<name>)"
+        )
+        self.gcode.register_mux_command(
+            "ACE_GET_FILAMENT_INFO", "UNIT", self.name, self.cmd_ACE_GET_FILAMENT_INFO,
+            desc="Query RFID filament info for a slot (UNIT=<name> INDEX=0-3)"
+        )
+
+        # Note: Do not also register non-mux commands with the same names.
+        # Klipper treats the mux base command as the command name, so registering
+        # both would halt with "gcode command ... already registered".
+
+    def cmd_ACE_GET_STATUS(self, gcmd):
+        return self._cmd_guard("ACE_GET_STATUS", lambda: self._cmd_ACE_GET_STATUS(gcmd))
+
+    def _cmd_ACE_GET_STATUS(self, gcmd):
+        self._ensure_connected()
+
+        status = self.protocol.get_status()
+        info = self.device_info or {}
+
+        if not status:
+            self.afc.gcode.respond_info(f"ACE_GET_STATUS: No response from unit '{self.name}' ({self.serial})")
+            return
+
+        model = info.get("model", "Unknown")
+        firmware = info.get("firmware", "Unknown")
+        dryer = status.get("dryer", status.get("dryer_status", None))
+        temp = status.get("temp", None)
+        slots = status.get("slots", None)
+
+        lines = [
+            f"ACE unit: {self.name}",
+            f"  Port: {self.serial}",
+            f"  Model: {model}",
+            f"  Firmware: {firmware}",
+        ]
+        if dryer is not None:
+            lines.append(f"  Dryer: {dryer}")
+        if temp is not None:
+            lines.append(f"  Temp: {temp}")
+        if isinstance(slots, list):
+            lines.append(f"  Slots: {slots}")
+        else:
+            lines.append("  Slots: (unavailable)")
+
+        self.afc.gcode.respond_info("\n".join(lines))
+
+    def _parse_index_speed_len(self, gcmd):
+        index = gcmd.get_int("INDEX", None)
+        if index is None:
+            index = gcmd.get_int("LANE", None)
+        if index is None:
+            raise error("AFC_ACE: Missing INDEX (or LANE) parameter")
+        if index < 0 or index > 3:
+            raise error("AFC_ACE: INDEX must be 0-3 for an ACE unit")
+
+        length = gcmd.get_float("LENGTH", None)
+        if length is None:
+            raise error("AFC_ACE: Missing LENGTH parameter")
+        if length <= 0:
+            raise error("AFC_ACE: LENGTH must be > 0")
+
+        speed = gcmd.get_int("SPEED", 50)
+        speed = max(10, min(80, int(speed)))
+        return index, length, speed
+
+    def cmd_ACE_FEED(self, gcmd):
+        return self._cmd_guard("ACE_FEED", lambda: self._cmd_ACE_FEED(gcmd))
+
+    def _cmd_ACE_FEED(self, gcmd):
+        self._ensure_connected()
+        index, length, speed = self._parse_index_speed_len(gcmd)
+        ok = self.protocol.feed(index, length, speed)
+        if not ok:
+            raise error(f"AFC_ACE: ACE_FEED failed (unit={self.name} index={index})")
+        self.afc.gcode.respond_info(f"ACE_FEED: unit={self.name} index={index} length={int(length)} speed={speed}")
+
+    def cmd_ACE_RETRACT(self, gcmd):
+        return self._cmd_guard("ACE_RETRACT", lambda: self._cmd_ACE_RETRACT(gcmd))
+
+    def _cmd_ACE_RETRACT(self, gcmd):
+        self._ensure_connected()
+        index, length, speed = self._parse_index_speed_len(gcmd)
+        ok = self.protocol.retract(index, length, speed)
+        if not ok:
+            raise error(f"AFC_ACE: ACE_RETRACT failed (unit={self.name} index={index})")
+        self.afc.gcode.respond_info(f"ACE_RETRACT: unit={self.name} index={index} length={int(length)} speed={speed}")
+
+    def cmd_ACE_START_DRYING(self, gcmd):
+        return self._cmd_guard("ACE_START_DRYING", lambda: self._cmd_ACE_START_DRYING(gcmd))
+
+    def _cmd_ACE_START_DRYING(self, gcmd):
+        self._ensure_connected()
+        temp = gcmd.get_int("TEMP", 55)
+        duration = gcmd.get_int("DURATION", 240)
+        ok = self.protocol.start_dryer(temp, duration)
+        if not ok:
+            raise error(f"AFC_ACE: ACE_START_DRYING failed (unit={self.name})")
+        # Immediately re-query status so users can verify it actually started.
+        import time
+        time.sleep(0.2)
+        status = self.protocol.get_status() or {}
+        dryer = status.get("dryer", status.get("dryer_status", None))
+        cur_temp = status.get("temp", None)
+        self.afc.gcode.respond_info(
+            f"ACE_START_DRYING: unit={self.name} temp={temp} duration={duration}min"
+            f" (reported dryer={dryer} temp={cur_temp})"
+        )
+
+    def cmd_ACE_STOP_DRYING(self, gcmd):
+        return self._cmd_guard("ACE_STOP_DRYING", lambda: self._cmd_ACE_STOP_DRYING(gcmd))
+
+    def _cmd_ACE_STOP_DRYING(self, gcmd):
+        self._ensure_connected()
+        ok = self.protocol.stop_dryer()
+        if not ok:
+            raise error(f"AFC_ACE: ACE_STOP_DRYING failed (unit={self.name})")
+        self.afc.gcode.respond_info(f"ACE_STOP_DRYING: unit={self.name}")
+
+    def cmd_ACE_ENABLE_FEED_ASSIST(self, gcmd):
+        return self._cmd_guard("ACE_ENABLE_FEED_ASSIST", lambda: self._cmd_ACE_ENABLE_FEED_ASSIST(gcmd))
+
+    def _cmd_ACE_ENABLE_FEED_ASSIST(self, gcmd):
+        self._ensure_connected()
+        lane = gcmd.get_int("LANE", None)
+        if lane is None:
+            lane = gcmd.get_int("INDEX", None)
+        if lane is None:
+            raise error("AFC_ACE: Missing LANE (or INDEX) parameter")
+        if lane < 0 or lane > 3:
+            raise error("AFC_ACE: LANE must be 0-3 for an ACE unit")
+        ok = self.protocol.set_feed_assist(lane, True)
+        if not ok:
+            raise error(f"AFC_ACE: ACE_ENABLE_FEED_ASSIST failed (unit={self.name} lane={lane})")
+        self.afc.gcode.respond_info(f"ACE_ENABLE_FEED_ASSIST: unit={self.name} lane={lane}")
+
+    def cmd_ACE_DISABLE_FEED_ASSIST(self, gcmd):
+        return self._cmd_guard("ACE_DISABLE_FEED_ASSIST", lambda: self._cmd_ACE_DISABLE_FEED_ASSIST(gcmd))
+
+    def _cmd_ACE_DISABLE_FEED_ASSIST(self, gcmd):
+        self._ensure_connected()
+        lane = gcmd.get_int("LANE", None)
+        if lane is None:
+            lane = gcmd.get_int("INDEX", None)
+        if lane is None:
+            raise error("AFC_ACE: Missing LANE (or INDEX) parameter")
+        if lane < 0 or lane > 3:
+            raise error("AFC_ACE: LANE must be 0-3 for an ACE unit")
+        ok = self.protocol.set_feed_assist(lane, False)
+        if not ok:
+            raise error(f"AFC_ACE: ACE_DISABLE_FEED_ASSIST failed (unit={self.name} lane={lane})")
+        self.afc.gcode.respond_info(f"ACE_DISABLE_FEED_ASSIST: unit={self.name} lane={lane}")
+
+    def cmd_ACE_ENABLE_RFID(self, gcmd):
+        return self._cmd_guard("ACE_ENABLE_RFID", lambda: self._cmd_ACE_ENABLE_RFID(gcmd))
+
+    def _cmd_ACE_ENABLE_RFID(self, gcmd):
+        self._ensure_connected()
+        ok = self.protocol.enable_rfid()
+        if not ok:
+            raise error(f"AFC_ACE: ACE_ENABLE_RFID failed (unit={self.name})")
+        self.afc.gcode.respond_info(f"ACE_ENABLE_RFID: unit={self.name}")
+
+    def cmd_ACE_DISABLE_RFID(self, gcmd):
+        return self._cmd_guard("ACE_DISABLE_RFID", lambda: self._cmd_ACE_DISABLE_RFID(gcmd))
+
+    def _cmd_ACE_DISABLE_RFID(self, gcmd):
+        self._ensure_connected()
+        ok = self.protocol.disable_rfid()
+        if not ok:
+            raise error(f"AFC_ACE: ACE_DISABLE_RFID failed (unit={self.name})")
+        self.afc.gcode.respond_info(f"ACE_DISABLE_RFID: unit={self.name}")
+
+    def cmd_ACE_GET_FILAMENT_INFO(self, gcmd):
+        return self._cmd_guard("ACE_GET_FILAMENT_INFO", lambda: self._cmd_ACE_GET_FILAMENT_INFO(gcmd))
+
+    def _cmd_ACE_GET_FILAMENT_INFO(self, gcmd):
+        self._ensure_connected()
+        index = gcmd.get_int("INDEX", None)
+        if index is None:
+            index = gcmd.get_int("LANE", None)
+        if index is None:
+            raise error("AFC_ACE: Missing INDEX (or LANE) parameter")
+        if index < 0 or index > 3:
+            raise error("AFC_ACE: INDEX must be 0-3 for an ACE unit")
+
+        info = self.protocol.get_filament_info(index)
+        if not info:
+            self.afc.gcode.respond_info(f"ACE_GET_FILAMENT_INFO: No response (unit={self.name} index={index})")
+            return
+        # Print as JSON so it can be copy/pasted easily.
+        import json
+        self.afc.gcode.respond_info(f"ACE_GET_FILAMENT_INFO: {json.dumps(info, sort_keys=True)}")
 
     def _build_lane_mapping(self):
         """Build mapping between AFC lanes and ACE slots"""

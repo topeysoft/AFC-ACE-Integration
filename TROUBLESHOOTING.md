@@ -53,7 +53,7 @@ auto_detect: true
 extruder: extruder
 # NO hub line here!
 
-[AFC_lane leg1]
+[AFC_lane lane1]
 unit: ace1:0
 map: T0
 extruder: extruder

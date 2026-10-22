@@ -71,7 +71,7 @@ cat ~/printer_data/config/AFC/AFC_ACE_Pro.cfg
 
 **Should contain:**
 - `[AFC_ACE ace1]` section
-- 4 `[AFC_lane legN]` sections
+- 4 `[AFC_lane laneN]` sections
 - Serial port or auto_detect configuration
 
 ### 4. Klipper Integration Test
@@ -102,10 +102,10 @@ tail -100 ~/printer_data/logs/klippy.log
 ```
 AFC_ACE: Initialized unit 'ace1'
 AFC_ACE: Connected to ACE Pro (FW: v1.2.3)
-AFC_ACE: Mapped lane 'leg1' → slot 0
-AFC_ACE: Mapped lane 'leg2' → slot 1
-AFC_ACE: Mapped lane 'leg3' → slot 2
-AFC_ACE: Mapped lane 'leg4' → slot 3
+AFC_ACE: Mapped lane 'lane1' → slot 0
+AFC_ACE: Mapped lane 'lane2' → slot 1
+AFC_ACE: Mapped lane 'lane3' → slot 2
+AFC_ACE: Mapped lane 'lane4' → slot 3
 ```
 
 **If errors:**

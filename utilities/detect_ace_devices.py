@@ -114,7 +114,7 @@ def generate_config():
         # Generate 4 lanes per ACE device
         for slot in range(4):
             lane_num = i * 4 + slot
-            lane_name = f"leg{lane_num + 1}"
+            lane_name = f"lane{lane_num + 1}"
 
             print(f"[AFC_lane {lane_name}]")
             print(f"unit: {unit_name}:{slot}")

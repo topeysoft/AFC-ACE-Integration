@@ -40,6 +40,41 @@ print_error() {
     echo -e "${RED}[✗]${NC} $1"
 }
 
+# Insert a line into printer.cfg before SAVE_CONFIG auto section.
+# If no SAVE_CONFIG marker is present, append at end.
+# Does nothing if the line already exists (exact match).
+ensure_printer_cfg_line() {
+    local printer_cfg="$1"
+    local line="$2"
+
+    mkdir -p "$(dirname "$printer_cfg")"
+    touch "$printer_cfg"
+
+    if grep -qF -- "$line" "$printer_cfg"; then
+        print_status "printer.cfg already contains: $line"
+        return 0
+    fi
+
+    local tmpfile
+    tmpfile="$(mktemp)"
+
+    if grep -q '^#\\*# <---------------------- SAVE_CONFIG ---------------------->' "$printer_cfg"; then
+        awk -v ins="$line" '
+            !done && $0 ~ /^#\\*# <---------------------- SAVE_CONFIG ---------------------->/ {
+                print ins
+                print ""
+                done=1
+            }
+            { print }
+        ' "$printer_cfg" > "$tmpfile"
+        mv "$tmpfile" "$printer_cfg"
+        print_status "Inserted into printer.cfg before SAVE_CONFIG: $line"
+    else
+        printf '\n%s\n' "$line" >> "$printer_cfg"
+        print_status "Appended to printer.cfg: $line"
+    fi
+}
+
 # Check if running as root
 if [[ $EUID -eq 0 ]]; then
    print_error "This script must NOT be run as root"
@@ -132,6 +167,10 @@ echo -e "${BLUE}Auto-detecting ACE devices...${NC}"
 
 # Run auto-detection
 python3 "${SCRIPT_DIR}/utilities/detect_ace_devices.py"
+
+echo ""
+echo -e "${BLUE}Updating printer.cfg includes...${NC}"
+ensure_printer_cfg_line "${CONFIG_DIR}/printer.cfg" "[include AFC/*.cfg]"
 
 echo ""
 echo -e "${GREEN}========================================${NC}"

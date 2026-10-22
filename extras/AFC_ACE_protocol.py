@@ -348,6 +348,26 @@ class AceProtocol:
         """Get device status (slots, dryer, temperature, etc.)"""
         return self.send_command("get_status")
 
+    def enable_rfid(self) -> bool:
+        """Enable RFID reader on the ACE."""
+        result = self.send_command("enable_rfid")
+        return result is not None
+
+    def disable_rfid(self) -> bool:
+        """Disable RFID reader on the ACE."""
+        result = self.send_command("disable_rfid")
+        return result is not None
+
+    def get_filament_info(self, index: int) -> Optional[Dict[str, Any]]:
+        """
+        Get filament metadata from RFID for a slot.
+
+        Returns a dict like:
+          {index, sku, brand, type, color, rfid, extruder_temp, hotbed_temp, diameter, total, current}
+        or None on failure.
+        """
+        return self.send_command("get_filament_info", {"index": int(index)})
+
     def feed(self, index: int, length: float, speed: int) -> bool:
         """
         Feed filament forward.
@@ -413,9 +433,11 @@ class AceProtocol:
         Returns:
             True if successful
         """
-        result = self.send_command("dryer_start", {
+        # ACEPRO reference implementation uses method "drying" with params
+        # {temp: <c>, duration: <minutes>}
+        result = self.send_command("drying", {
             "temp": temp,
-            "time": duration
+            "duration": duration
         })
         return result is not None
 
@@ -426,5 +448,6 @@ class AceProtocol:
         Returns:
             True if successful
         """
-        result = self.send_command("dryer_stop")
+        # ACEPRO reference implementation uses method "drying_stop"
+        result = self.send_command("drying_stop")
         return result is not None
